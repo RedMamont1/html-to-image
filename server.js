@@ -59,7 +59,9 @@ app.post('/render', async (req, res) => {
 
     const screenshot = await page.screenshot(screenshotOptions);
 
-    res.set('Content-Type', `image/${format === 'webp' ? 'webp' : 'png'}`);
+    const ext = format === 'webp' ? 'webp' : 'png';
+    res.set('Content-Type', `image/${ext}`);
+    res.set('Content-Disposition', `attachment; filename="card.${ext}"`);
     res.set('Content-Length', screenshot.length);
     res.send(screenshot);
   } catch (err) {
