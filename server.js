@@ -23,17 +23,39 @@ async function getBrowser() {
   return browser;
 }
 
+// Upload buffer to tmpfiles.org, return direct download URL
+async function uploadToTmpfiles(buffer, filename) {
+  const blob = new Blob([buffer], { type: 'image/webp' });
+  const fd = new FormData();
+  fd.set('file', blob, filename);
+
+  const resp = await fetch('https://tmpfiles.org/api/v1/upload', {
+    method: 'POST',
+    body: fd
+  });
+
+  const result = await resp.json();
+  if (result.status !== 'ok' || !result.data?.url) {
+    throw new Error(`tmpfiles upload failed: ${JSON.stringify(result)}`);
+  }
+  // Convert page URL to direct download URL
+  return result.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+}
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Render HTML to image and upload to tmpfiles.org
+// Returns JSON: { url, filename }
 app.post('/render', async (req, res) => {
   const {
     html,
     width = 760,
     height = 507,
     format = 'webp',
-    quality = 80
+    quality = 80,
+    slug = 'card'
   } = req.body;
 
   if (!html) {
@@ -58,12 +80,13 @@ app.post('/render', async (req, res) => {
     }
 
     const screenshot = await page.screenshot(screenshotOptions);
-
     const ext = format === 'webp' ? 'webp' : 'png';
-    res.set('Content-Type', `image/${ext}`);
-    res.set('Content-Disposition', `attachment; filename="card.${ext}"`);
-    res.set('Content-Length', screenshot.length);
-    res.send(screenshot);
+    const filename = `${slug}.${ext}`;
+
+    // Upload directly to tmpfiles.org (avoids n8n binary serialization issues)
+    const url = await uploadToTmpfiles(screenshot, filename);
+
+    res.json({ url, filename, size: screenshot.length });
   } catch (err) {
     console.error('Render error:', err.message);
     res.status(500).json({ error: err.message });
