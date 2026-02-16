@@ -35,7 +35,7 @@ async function uploadToTmpfiles(buffer, filename) {
   });
 
   const result = await resp.json();
-  if (result.status !== 'ok' || !result.data?.url) {
+  if (!result.data?.url) {
     throw new Error(`tmpfiles upload failed: ${JSON.stringify(result)}`);
   }
   // Convert page URL to direct download URL
